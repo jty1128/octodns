@@ -1,7 +1,3 @@
-#
-#
-#
-
 from collections import defaultdict
 from copy import deepcopy
 from logging import getLogger
@@ -20,7 +16,7 @@ def unquote(s):
 
 
 class Record(EqualityTupleMixin):
-    log = getLogger('Record')
+    log = getLogger("Record")
 
     _CLASSES = {}
 
@@ -50,35 +46,33 @@ class Record(EqualityTupleMixin):
             reasons.append(str(e))
             name = str(name)
 
-        if ' ' in name or '\t' in name:
-            reasons.append('invalid record, whitespace is not allowed')
+        if " " in name or "\t" in name:
+            reasons.append("invalid record, whitespace is not allowed")
 
-        fqdn = f'{name}.{zone.name}' if name else zone.name
-        context = getattr(data, 'context', None)
+        fqdn = f"{name}.{zone.name}" if name else zone.name
+        context = getattr(data, "context", None)
         try:
-            _type = data['type']
+            _type = data["type"]
         except KeyError:
-            msg = f'Invalid record {idna_decode(fqdn)}, missing type'
+            msg = f"Invalid record {idna_decode(fqdn)}, missing type"
             if context:
-                msg += f', {context}'
+                msg += f", {context}"
             raise Exception(msg)
         try:
             _class = cls._CLASSES[_type]
         except KeyError:
             msg = f'Unknown record type: "{_type}"'
             if context:
-                msg += f', {context}'
+                msg += f", {context}"
             raise Exception(msg)
         reasons.extend(_class.validate(name, fqdn, data))
         try:
-            lenient |= data['octodns']['lenient']
+            lenient |= data["octodns"]["lenient"]
         except KeyError:
             pass
         if reasons:
             if lenient:
-                cls.log.warning(
-                    ValidationError.build_message(fqdn, reasons, context)
-                )
+                cls.log.warning(ValidationError.build_message(fqdn, reasons, context))
             else:
                 raise ValidationError(fqdn, reasons, context)
         return _class(zone, name, data, source=source, context=context)
@@ -86,35 +80,33 @@ class Record(EqualityTupleMixin):
     @classmethod
     def validate(cls, name, fqdn, data):
         reasons = []
-        if name == '@':
+        if name == "@":
             reasons.append('invalid name "@", use "" instead')
         n = len(fqdn)
         if n > 253:
             reasons.append(
-                f'invalid fqdn, "{idna_decode(fqdn)}" is too long at {n} '
-                'chars, max is 253'
+                f'invalid fqdn, "{fqdn}" is too long at {n} chars, max is 253'
             )
-        for label in name.split('.'):
+        for label in name.split("."):
             n = len(label)
             if n > 63:
                 reasons.append(
-                    f'invalid label, "{label}" is too long at {n}'
-                    ' chars, max is 63'
+                    f'invalid label, "{label}" is too long at {n} chars, max is 63'
                 )
         # TODO: look at the idna lib for a lot more potential validations...
         try:
-            ttl = int(data['ttl'])
+            ttl = int(data["ttl"])
             if ttl < 0:
-                reasons.append('invalid ttl')
+                reasons.append("invalid ttl")
         except KeyError:
-            reasons.append('missing ttl')
+            reasons.append("missing ttl")
         try:
-            if data['octodns']['healthcheck']['protocol'] not in (
-                'HTTP',
-                'HTTPS',
-                'TCP',
+            if data["octodns"]["healthcheck"]["protocol"] not in (
+                "HTTP",
+                "HTTPS",
+                "TCP",
             ):
-                reasons.append('invalid healthcheck protocol')
+                reasons.append("invalid healthcheck protocol")
         except KeyError:
             pass
         return reasons
@@ -135,9 +127,7 @@ class Record(EqualityTupleMixin):
             name = zone.hostname_from_fqdn(rr.name)
             _class = cls._CLASSES[rr._type]
             data = _class.data_from_rrs(rrs)
-            record = Record.new(
-                zone, name, data, lenient=lenient, source=source
-            )
+            record = Record.new(zone, name, data, lenient=lenient, source=source)
             records.append(record)
 
         return records
@@ -156,21 +146,21 @@ class Record(EqualityTupleMixin):
         else:
             self.name = self.decoded_name = name
         self.log.debug(
-            '__init__: zone.name=%s, type=%11s, name=%s',
+            "__init__: zone.name=%s, type=%11s, name=%s",
             zone.decoded_name,
             self.__class__.__name__,
             self.decoded_name,
         )
         self.source = source
         self.context = context
-        self.ttl = int(data['ttl'])
+        self.ttl = int(data["ttl"])
 
-        self._octodns = data.get('octodns', {})
+        self._octodns = data.get("octodns", {})
 
     def _data(self):
-        ret = {'ttl': self.ttl}
+        ret = {"ttl": self.ttl}
         if self._octodns:
-            ret['octodns'] = deepcopy(self._octodns)
+            ret["octodns"] = deepcopy(self._octodns)
         if self.context:
             return ContextDict(ret, context=self.context)
         return ret
@@ -184,60 +174,60 @@ class Record(EqualityTupleMixin):
         # TODO: these should be calculated and set in __init__ rather than on
         # each use
         if self.name:
-            return f'{self.name}.{self.zone.name}'
+            return f"{self.name}.{self.zone.name}"
         return self.zone.name
 
     @property
     def decoded_fqdn(self):
         if self.decoded_name:
-            return f'{self.decoded_name}.{self.zone.decoded_name}'
+            return f"{self.decoded_name}.{self.zone.decoded_name}"
         return self.zone.decoded_name
 
     @property
     def ignored(self):
-        return self._octodns.get('ignored', False)
+        return self._octodns.get("ignored", False)
 
     @property
     def excluded(self):
-        return self._octodns.get('excluded', [])
+        return self._octodns.get("excluded", [])
 
     @property
     def included(self):
-        return self._octodns.get('included', [])
+        return self._octodns.get("included", [])
 
     def healthcheck_host(self, value=None):
-        healthcheck = self._octodns.get('healthcheck', {})
-        if healthcheck.get('protocol', None) == 'TCP':
+        healthcheck = self._octodns.get("healthcheck", {})
+        if healthcheck.get("protocol", None) == "TCP":
             return None
-        return healthcheck.get('host', self.fqdn[:-1]) or value
+        return healthcheck.get("host", self.fqdn[:-1]) or value
 
     @property
     def healthcheck_path(self):
-        healthcheck = self._octodns.get('healthcheck', {})
-        if healthcheck.get('protocol', None) == 'TCP':
+        healthcheck = self._octodns.get("healthcheck", {})
+        if healthcheck.get("protocol", None) == "TCP":
             return None
         try:
-            return healthcheck['path']
+            return healthcheck["path"]
         except KeyError:
-            return '/_dns'
+            return "/_dns"
 
     @property
     def healthcheck_protocol(self):
         try:
-            return self._octodns['healthcheck']['protocol']
+            return self._octodns["healthcheck"]["protocol"]
         except KeyError:
-            return 'HTTPS'
+            return "HTTPS"
 
     @property
     def healthcheck_port(self):
         try:
-            return int(self._octodns['healthcheck']['port'])
+            return int(self._octodns["healthcheck"]["port"])
         except KeyError:
             return 443
 
     @property
     def lenient(self):
-        return self._octodns.get('lenient', False)
+        return self._octodns.get("lenient", False)
 
     def changes(self, other, target):
         # We're assuming we have the same name and type if we're being compared
@@ -247,7 +237,7 @@ class Record(EqualityTupleMixin):
     def copy(self, zone=None):
         # data, via _data(), will preserve context
         data = self.data
-        data['type'] = self._type
+        data["type"] = self._type
 
         return Record.new(
             zone if zone else self.zone,
@@ -262,22 +252,22 @@ class Record(EqualityTupleMixin):
     # is useful when computing diffs/changes.
 
     def __hash__(self):
-        return f'{self.name}:{self._type}'.__hash__()
+        return f"{self.name}:{self._type}".__hash__()
 
     def _equality_tuple(self):
         return (self.name, self._type)
 
     def __repr__(self):
         # Make sure this is always overridden
-        raise NotImplementedError('Abstract base class, __repr__ required')
+        raise NotImplementedError("Abstract base class, __repr__ required")
 
 
-class ValuesMixin(object):
+class ValuesMixin:
     @classmethod
     def validate(cls, name, fqdn, data):
         reasons = super().validate(name, fqdn, data)
 
-        values = data.get('values', data.get('value', []))
+        values = data.get("values", data.get("value", []))
 
         reasons.extend(cls._value_type.validate(values, cls._type))
 
@@ -289,15 +279,15 @@ class ValuesMixin(object):
         rr = rrs[0]
         # values come from parsing the rdata portion of all rrs
         values = [cls._value_type.parse_rdata_text(rr.rdata) for rr in rrs]
-        return {'ttl': rr.ttl, 'type': rr._type, 'values': values}
+        return {"ttl": rr.ttl, "type": rr._type, "values": values}
 
     def __init__(self, zone, name, data, source=None, context=None):
         super().__init__(zone, name, data, source=source, context=context)
         try:
-            values = data['values']
+            values = data["values"]
         except KeyError:
             try:
-                values = [data['value']]
+                values = [data["value"]]
             except KeyError:
                 values = []
         self.values = sorted(self._value_type.process(values))
@@ -312,13 +302,13 @@ class ValuesMixin(object):
         if len(self.values) == 1:
             v = self.values[0]
             if v:
-                ret['value'] = getattr(v, 'data', v)
+                ret["value"] = getattr(v, "data", v)
         else:
-            values = [getattr(v, 'data', v) for v in self.values if v]
+            values = [getattr(v, "data", v) for v in self.values if v]
             if len(values) == 1:
-                ret['value'] = values[0]
+                ret["value"] = values[0]
             else:
-                ret['values'] = values
+                ret["values"] = values
 
         return ret
 
@@ -338,19 +328,17 @@ class ValuesMixin(object):
     def __repr__(self):
         values = "', '".join([str(v) for v in self.values])
         klass = self.__class__.__name__
-        octodns = ''
+        octodns = ""
         if self._octodns:
-            octodns = f', {self._octodns}'
+            octodns = f", {self._octodns}"
         return f"<{klass} {self._type} {self.ttl}, {self.decoded_fqdn}, ['{values}']{octodns}>"
 
 
-class ValueMixin(object):
+class ValueMixin:
     @classmethod
     def validate(cls, name, fqdn, data):
         reasons = super().validate(name, fqdn, data)
-        reasons.extend(
-            cls._value_type.validate(data.get('value', None), cls._type)
-        )
+        reasons.extend(cls._value_type.validate(data.get("value", None), cls._type))
         return reasons
 
     @classmethod
@@ -358,14 +346,14 @@ class ValueMixin(object):
         # single value, so single rr only...
         rr = rrs[0]
         return {
-            'ttl': rr.ttl,
-            'type': rr._type,
-            'value': cls._value_type.parse_rdata_text(rr.rdata),
+            "ttl": rr.ttl,
+            "type": rr._type,
+            "value": cls._value_type.parse_rdata_text(rr.rdata),
         }
 
     def __init__(self, zone, name, data, source=None, context=None):
         super().__init__(zone, name, data, source=source, context=context)
-        self.value = self._value_type.process(data['value'])
+        self.value = self._value_type.process(data["value"])
 
     def changes(self, other, target):
         if self.value != other.value:
@@ -374,7 +362,7 @@ class ValueMixin(object):
 
     def _data(self):
         ret = super()._data()
-        ret['value'] = getattr(self.value, 'data', self.value)
+        ret["value"] = getattr(self.value, "data", self.value)
         return ret
 
     @property
@@ -383,7 +371,7 @@ class ValueMixin(object):
 
     def __repr__(self):
         klass = self.__class__.__name__
-        octodns = ''
+        octodns = ""
         if self._octodns:
-            octodns = f', {self._octodns}'
-        return f'<{klass} {self._type} {self.ttl}, {self.decoded_fqdn}, {self.value}{octodns}>'
+            octodns = f", {self._octodns}"
+        return f"<{klass} {self._type} {self.ttl}, {self.decoded_fqdn}, {self.value}{octodns}>"

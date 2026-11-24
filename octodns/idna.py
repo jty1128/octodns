@@ -1,7 +1,3 @@
-#
-#
-#
-
 from collections.abc import MutableMapping
 
 from idna import IDNAError as _IDNAError
@@ -23,28 +19,28 @@ def idna_encode(name):
     # #diff-0debbb2447ce5debf2872cb0e17b18babe3566e9d9900739e8581b355bd513f7R39
     name = name.lower()
     try:
-        name.encode('ascii')
+        name.encode("ascii")
         # No utf8 chars, just use as-is
         return name
     except UnicodeEncodeError:
         try:
-            if name.startswith('*'):
+            if name.startswith("*"):
                 # idna.encode doesn't like the *
-                name = _encode(name[2:]).decode('utf-8')
-                return f'*.{name}'
-            return _encode(name).decode('utf-8')
+                name = _encode(name[1:]).decode("utf-8")
+                return f"*.{name}"
+            return _encode(name).decode("utf-8")
         except _IDNAError as e:
             raise IdnaError(e)
 
 
 def idna_decode(name):
-    pieces = name.lower().split('.')
-    if any(p.startswith('xn--') for p in pieces):
+    pieces = name.lower().split(".")
+    if any(p.startswith("xn--") for p in pieces):
         try:
             # it's idna
-            if name.startswith('*'):
+            if name.startswith("*"):
                 # idna.decode doesn't like the *
-                return f'*.{_decode(name[2:])}'
+                return f"*.{_decode(name[1:])}"
             return _decode(name)
         except _IDNAError as e:
             raise IdnaError(e)
@@ -53,7 +49,7 @@ def idna_decode(name):
 
 
 class IdnaDict(MutableMapping):
-    '''A dict type that is insensitive to case and utf-8/idna encoded strings'''
+    """A dict type that is insensitive to case and utf-8/idna encoded strings"""
 
     def __init__(self, data=None):
         self._data = dict()
